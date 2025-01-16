@@ -1,8 +1,9 @@
-# Ignore everything by default
-*
-
-# Allow the .gitignore file itself
-!.gitignore
-
-# Allow the src directory and its contents
-!src/
+build/
+devel/
+install/
+logs/
+*.pyc
+.DS_Store
+*.pt
+.catkin_tools/
+.vscode/
