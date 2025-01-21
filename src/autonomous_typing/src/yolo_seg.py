@@ -18,7 +18,7 @@ class YoloPixelSegmentationNode:
         self.output_topic = rospy.get_param('~output_topic', '/camera_gripper/processed_image')
         self.class_to_detect = rospy.get_param('~class_to_detect', 66)
         
-        # Real-world keyboard dimensions (mm)
+        # Real-world keyboard dimensions (mm)l
         self.KEYBOARD_LENGTH = 354.076
         self.KEYBOARD_WIDTH = 123.444
         
@@ -153,6 +153,11 @@ class YoloPixelSegmentationNode:
                                                                   tvec, 
                                                                   self.camera_matrix, 
                                                                   self.dist_coeffs)
+                            
+                            np.save('projected_points.npy', projected_points)
+                            # with open('projected_points.json', 'w') as f:
+                            #     json.dump(projected_points, f)
+                                                    
                             
                             # Draw points with depth information
                             for i, (point, proj_point) in enumerate(zip(scaled_points, projected_points)):

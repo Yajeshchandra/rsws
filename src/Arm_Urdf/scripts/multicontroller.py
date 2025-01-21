@@ -171,54 +171,53 @@ class VelocityController(BaseController):
         trajectory_msg.points = [point]
         self.trajectory_pub.publish(trajectory_msg)
 
-class PositionController(BaseController):
-    """Position-based controller"""
+class KeyboardTyperController(BaseController):
     
-    def __init__(self, shared_resources: SharedResources):
+    def __init__(self, shared_resources):
         super().__init__(shared_resources)
+        self.target_velocity = None
         self.target_position = None
-        self.kp = 100.0  # Position gain
-        self.kd = 20.0   # Velocity gain
+        self.velocity_scale = 0.1
+        self.pressed_keys = set()
         
-    def set_target(self, position: np.ndarray):
-        self.target_position = position
+        # Initialize ROS publisher
+        self.trajectory_pub = rospy.Publisher('/joint_trajectory', JointTrajectory, queue_size=10)
         
-    def compute_control(self) -> np.ndarray:
-        if self.target_position is None:
-            return np.zeros(self.model.nv)
-            
-        error = self.target_position - self.q
-        velocity_error = -self.dq
-        return self.kp * error + self.kd * velocity_error
-
-class ImpedanceController(BaseController):
-    """Impedance-based controller"""
+        self.keypoints = None
+        self.input_topic = rospy.get_param('~input_topic', '/camera_gripper/image_raw')
+        self.camera_info_topic = rospy.get_param('~camera_info_topic', '/camera_gripper/camera_info')
+        self.output_topic = rospy.get_param('~output_topic', '/camera_gripper/processed_image')
+        self.class_to_detect = rospy.get_param('~class_to_detect', 66)
+        
+         # Real-world keyboard dimensions (mm)l
+        self.KEYBOARD_LENGTH = 354.076
+        self.KEYBOARD_WIDTH = 123.444
+        
+        # Initialize YOLO model
+        self.model = YOLO('yolov8n-seg.pt')
+        
+        # Camera parameters (will be updated from camera_info)
+        self.camera_matrix = None
+        self.dist_coeffs = None
+        
+        # Setup ROS communication
+        self.bridge = CvBridge()
+        self.subscriber = rospy.Subscriber(self.input_topic, Image, self.image_callback)
+        self.camera_info_sub = rospy.Subscriber(self.camera_info_topic, CameraInfo, self.camera_info_callback)
+        self.publisher = rospy.Publisher(self.output_topic, Image, queue_size=10)
+        
+        # Load keyboard layout
+        with open('/home/ub20/rsws/src/autonomous_typing/src/keyboard_layout.json', 'r') as f:
+            self.keyboard_points_dict = json.load(f)
+        
+        rospy.loginfo("YoloPixelSegmentationNode initialized.")
     
-    def __init__(self, shared_resources: SharedResources):
-        super().__init__(shared_resources)
-        self.target_position = None
-        self.stiffness = np.eye(6) * 1000
-        self.damping = np.eye(6) * 50
+    def initialize_scan(self):
+        """Initialize the keyboard scanning process"""
         
-    def set_target(self, position: np.ndarray):
-        self.target_position = position
+    
+    def scan()
         
-    def compute_control(self) -> np.ndarray:
-        if self.target_position is None:
-            return np.zeros(self.model.nv)
-            
-        pin.forwardKinematics(self.model, self.data, self.q)
-        current_position = self.data.oMf[self.shared_resources.end_effector_frame].translation
-        
-        position_error = self.target_position - current_position
-        J = pin.computeFrameJacobian(
-            self.model, self.data, self.q,
-            self.shared_resources.end_effector_frame,
-            pin.ReferenceFrame.LOCAL_WORLD_ALIGNED
-        )
-        
-        f_imp = self.stiffness @ position_error
-        return J.T @ f_imp
 
 class MasterController:
     """Master controller managing multiple predefined controllers"""
@@ -276,8 +275,6 @@ class MasterController:
         # Create controller instances
         self.controllers = {
             "Velocity Controller": VelocityController(self.shared_resources),
-            "Position Controller": PositionController(self.shared_resources),
-            "Impedance Controller": ImpedanceController(self.shared_resources)
         }
         
         # Update GUI controller list

@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   trajectory_msgs
   sensor_msgs 
   std_msgs
+  
 )
 
 ## Ensure Python3 is available with necessary components
@@ -57,6 +58,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   src/keyboard_typing.py
   src/yolo_seg.py
+  src/yolo_seg_save.py
   src/controller.py
   src/multicontroller.py
 
