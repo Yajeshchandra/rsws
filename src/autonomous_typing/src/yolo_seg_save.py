@@ -3,6 +3,8 @@
 import rospy
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
+from tf2_geometry_msgs import do_transform_point
+
 import tf2_ros
 import tf2_geometry_msgs
 import cv2
@@ -11,6 +13,7 @@ from ultralytics import YOLO
 import json
 
 class YoloPixelSegmentationNode:
+    
     def __init__(self):
         rospy.init_node('yolo_pixel_segmentation_node', anonymous=True)
         
@@ -44,7 +47,7 @@ class YoloPixelSegmentationNode:
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         
         # Load keyboard layout
-        with open('/home/ub20/rsws/src/autonomous_typing/src/keyboard_layout.json', 'r') as f:
+        with open('keyboard_layout.json', 'r') as f:
             self.keyboard_points_dict = json.load(f)
         
         rospy.loginfo("YoloPixelSegmentationNode initialized.")
@@ -52,29 +55,46 @@ class YoloPixelSegmentationNode:
     def camera_info_callback(self, msg):
         self.camera_matrix = np.array(msg.K).reshape(3, 3)
         self.dist_coeffs = np.array(msg.D)
+        
 
-    def get_transform(self):
+
+    # def get_transform(self):
+    #     try:
+    #         # Get transform from camera frame to base frame
+    #         transform = self.tf_buffer.lookup_transform("world", self.camera_frame, rospy.Time(0), rospy.Duration(1.0))
+            
+    #         # Convert to 4x4 transformation matrix
+    #         translation = transform.transform.translation
+    #         rotation = transform.transform.rotation
+            
+    #         # # Create transformation matrix
+    #         # T_base_camera = np.eye(4)
+    #         # T_base_camera[:3, 3] = [translation.x, translation.y, translation.z]
+            
+    #         # # Convert quaternion to rotation matrix
+    #         # quat = [rotation.x, rotation.y, rotation.z, rotation.w]
+    #         # T_base_camera[:3, :3] = tf2_ros.transformations.quaternion_matrix(quat)[:3, :3]
+            
+    #         # return T_base_camera
+    #     except Exception as e:
+    #         rospy.logerr(f"Failed to get transform: {e}")
+    #         return None
+    
+    def get_transform(self, camera_point , camera_frame="camera_link1"):
+        """Transform a point from the camera frame to the world frame."""
+        tf_buffer = tf2_ros.Buffer()
+        listener = tf2_ros.TransformListener(tf_buffer)
+
         try:
-            # Get transform from camera frame to base frame
-            transform = self.tf_buffer.lookup_transform(self.base_frame, self.camera_frame, rospy.Time(0), rospy.Duration(1.0))
-            
-            # Convert to 4x4 transformation matrix
-            translation = transform.transform.translation
-            rotation = transform.transform.rotation
-            
-            # Create transformation matrix
-            T_base_camera = np.eye(4)
-            T_base_camera[:3, 3] = [translation.x, translation.y, translation.z]
-            
-            # Convert quaternion to rotation matrix
-            quat = [rotation.x, rotation.y, rotation.z, rotation.w]
-            T_base_camera[:3, :3] = tf2_ros.transformations.quaternion_matrix(quat)[:3, :3]
-            
-            return T_base_camera
-        except Exception as e:
-            rospy.logerr(f"Failed to get transform: {e}")
+            # Wait for the transform to be available
+            transform = tf_buffer.lookup_transform("world", camera_frame, rospy.Time(0), rospy.Duration(1.0))
+            # Transform the point
+            world_point = do_transform_point(camera_point, transform)
+            return world_point
+        except tf2_ros.LookupException as e:
+            rospy.logerr(f"Transform lookup failed: {e}")
             return None
-
+        
     def process_image(self, cv_image, results):
         vis_image = cv_image.copy()
         
@@ -117,13 +137,19 @@ class YoloPixelSegmentationNode:
                             self.draw_axes(vis_image, rvec, tvec, self.camera_matrix, self.dist_coeffs)
                             projected_points, _ = cv2.projectPoints(model_points, rvec, tvec, 
                                                                     self.camera_matrix, self.dist_coeffs)
-                            projected_points = projected_points.reshape(-1, 2)
+                            projected_points = projected_points.reshape(-1, 2) 
 
                             # Transform to base frame
-                            model_points_h = np.hstack((model_points, np.ones((model_points.shape[0], 1))))  # Homogeneous
-                            points_in_camera_frame = (np.hstack((np.eye(3), tvec)).dot(model_points_h.T)).T
-                            points_in_camera_frame_h = np.hstack((points_in_camera_frame, np.ones((points_in_camera_frame.shape[0], 1))))
-                            points_in_base_frame = (T_base_camera.dot(points_in_camera_frame_h.T)).T[:, :3]
+                            # model_points_h = np.hstack((model_points, np.ones((model_points.shape[0], 1))))  # Homogeneous
+                            # points_in_camera_frame = (np.hstack((np.eye(3), tvec)).dot(model_points_h.T)).T
+                            
+                            # points_in_camera_frame_h = np.hstack((points_in_camera_frame, np.ones((points_in_camera_frame.shape[0], 1))))
+                            
+                            # points_in_base_frame = (T_base_camera.dot(points_in_camera_frame_h.T)).T[:, :3]
+                            
+                            points_in_base_frame = []
+                            
+                            
 
                             # Save points
                             np.save('projected_points.npy', points_in_base_frame)
@@ -146,6 +172,9 @@ class YoloPixelSegmentationNode:
             self.publisher.publish(ros_image)
         except Exception as e:
             rospy.logerr(f"Error in image_callback: {e}")
+
+
+
 
 if __name__ == '__main__':
     try:
