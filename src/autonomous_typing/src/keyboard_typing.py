@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 # Ctrl+f and type TODO to see where to do changes
 
-import pinocchio as pin
-import numpy as np
-# from sklearn.linear_model import LinearRegression
 import rospy
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout
-from PyQt5.QtCore import Qt, QTimer
-from quadprog import solve_qp
 import os
+import numpy as np
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFrame
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont
+from pinocchio import visualize as pin_visualize
 from pinocchio.visualize import MeshcatVisualizer
-from typing import Dict, List, Tuple
-# from pynput.keyboard import Key, KeyCode, Listener
+from quadprog import solve_qp
 from ultralytics import YOLO
 import cv2
 from scipy.linalg import solve
+from typing import Dict, List, Tuple
+
 
 TOTAL_LENGTH_MM = 354.076  # Length in mm
 TOTAL_WIDTH_MM = 123.444   # Width in mm
@@ -84,30 +84,59 @@ class KeyboardTyperWithIK(QWidget):
         
     def setup_ui(self):
         """
-        Setup the user interface
+        Setup the user interface for the Keyboard Typer IK Controller.
+        This function is modular and suitable for integration into a larger ROS-based script.
         """
-        # Create main layout
+        # Create the main vertical layout
         layout = QVBoxLayout()
-        
-        # Add calibration button
+        layout.setAlignment(Qt.AlignCenter)  # Center-align all widgets in the layout
+        layout.setSpacing(15)  # Set spacing between widgets
+
+        # Add a header label
+        header_label = QLabel("Keyboard Typer IK Controller")
+        header_label.setFont(QFont("Arial", 16, QFont.Bold))  # Set font style and size
+        header_label.setAlignment(Qt.AlignCenter)  # Align text to the center
+        layout.addWidget(header_label)
+
+        # Add a separator line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(separator)
+
+        # Add the calibration button
         self.calibrate_btn = QPushButton('Calibrate Keyboard')
+        self.calibrate_btn.setFont(QFont("Arial", 12))  # Set button font size
+        self.calibrate_btn.setStyleSheet("background-color: #85C1E9; padding: 10px; border-radius: 5px;")
         self.calibrate_btn.clicked.connect(self.start_calibration)
         layout.addWidget(self.calibrate_btn)
-        
-        # Add start typing button
+
+        # Add the start typing button
         self.start_btn = QPushButton('Start Typing')
+        self.start_btn.setFont(QFont("Arial", 12))
+        self.start_btn.setStyleSheet("background-color: #82E0AA; padding: 10px; border-radius: 5px;")
         self.start_btn.clicked.connect(self.start_typing)
         layout.addWidget(self.start_btn)
-        
-        # Add home position button
+
+        # Add the go home button
         self.home_btn = QPushButton('Go Home')
+        self.home_btn.setFont(QFont("Arial", 12))
+        self.home_btn.setStyleSheet("background-color: #F5B041; padding: 10px; border-radius: 5px;")
         self.home_btn.clicked.connect(self.move_to_home)
         layout.addWidget(self.home_btn)
-        
-        # Set the layout
+
+        # Add a footer label
+        footer_label = QLabel("Ensure the keyboard is calibrated before typing.")
+        footer_label.setFont(QFont("Arial", 10, QFont.Italic))
+        footer_label.setAlignment(Qt.AlignCenter)
+        footer_label.setStyleSheet("color: #808080;")
+        layout.addWidget(footer_label)
+
+        # Set the layout and window properties
         self.setLayout(layout)
-        self.setWindowTitle('Keyboard Typer IK Controller')
-        self.resize(300, 200)
+        self.setWindowTitle('Keyboard Typer IK Controller')  # Set the window title
+        self.resize(400, 300)  # Set the window size
+        self.setStyleSheet("background-color: #FDFEFE;")  # Light background color
         
     def setup_control(self):
         """
